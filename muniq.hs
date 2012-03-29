@@ -40,41 +40,31 @@ uniq' (Group n [x]:y:xs) | x == y = uniq' (Group (n+1) [x] : xs)
 uniq' (x:xs) = x : uniq' xs
 uniq' [] = []
 
-nuniq :: Eq a => Int -> [a] -> [Uniqed a]
-nuniq n = nuniq' n . muniqNoop
-
-slices :: Int -> [a] -> [[a]]
-slices n l = take n l : slices n (drop n l)
-
---nuniq' n l = uniqAndDeSlice n $ slices n l
---  where
---    uniqAndDeSlice :: (Eq a) => Int -> [[Uniqed a]] -> [Uniqed a]
---    uniqAndDeSlice n (x:xs) = uniqAndDeSlice' n xs [] (Group 1 x)
---    uniqAndDeSlice' n (x:xs) acc (Group m y) | x == y    = uniqAndDeSlice' n xs acc $ Group (m+1) y
---                                             | otherwise = uniqAndDeslice' n xs (Group m y : acc) $ Group 1 x
---    uniqAndDeslice' n [] acc g = 
---    uniqAndDeSlice n [] = []
---    uniqAndDeSlice n xs = nuniq' n $ tail $ concat xs
-
 data Pattern = Pattern { patternLength :: Int
                        , patternStart :: Int
                        , patternTimes :: Int
                        }
-detectRepeat :: Int -> [a] -> [Pattern]
-detectRepeat length list = detectRepeat' length list length
-  where
-    detectRepeat' length list pos = case startsWithPattern length list pos of
-                                      Nothing -> detectRepeat' length (tail list) (pos+1)
-                                      Just (rest, pat) -> detectContinue length rest (pos+2*length)
-    startsWithPattern :: Int -> [a] -> Maybe ([a], Pattern)
-    startsWithPattern length list pos = let start = take length list
-                                            rest = drop length list
-                                            next = take length rest
-                                        in if start == next
-                                           then Just (rest, Pattern length pos 2)
-                                           else Nothing
+  deriving Show
 
-    detectContinue
+slices :: Int -> [a] -> [[a]]
+slices _ [] = []
+slices n l = let (start, rest) = splitAt n l in start : slices n rest
 
-    
+detectRepeat :: Eq a => Int -> [a] -> [Pattern]
+detectRepeat length list = 
+    let detectRepeat' :: Eq a => Int -> [a] -> [Pattern]
+        detectRepeat' pos list = [ Pattern length (pos+length*s) t
+                                 | (t, s) <- let r = rle $ slices length list 
+                                             in zip r $ scanl (+) 0 r
+                                 ]
+    in [ x | n <- [0 .. (length - 1)]
+           , x <- detectRepeat' n $ drop n list
+       ]
 
+rle :: Eq a => [a] -> [Int]
+rle = rle' 1
+  where rle' :: Eq a => Int -> [a] -> [Int]
+        rle' n (x:y:xs) | x == y    = rle' (n+1) (y:xs)
+                        | otherwise = n : rle' 1 (y:xs)
+        rle' n [_] = [n]
+        rle' _ []  = []
