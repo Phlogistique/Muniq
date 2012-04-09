@@ -1,37 +1,21 @@
--- This program converts a list of items into a tree exhibiting patterns of
--- repetitions into the list. The names comes from the 'uniq' utility from
--- UNIX. The M is for "multi-line".
---
--- For example, the list
---  1 2 1 2 4 1 2 1 2 4 5
--- could become
---  2×[ 2×[ 1 2 ] 4 ] 5
---
--- However, doing this is non-trivial, as there may be many ways to combine
--- patterns to describe the same list. The program shall implement several
--- strategies:
--- 
--- * Noop: does not detect any pattern
--- * Big-to-small: Always use the longest patterns
--- * Small-to-big: Always use the smallest patterns
--- * Efficiency-first: Always use the patterns that result in the list being
---   the most shortened.
--- * Brute-force: Find the shortest description, no matter the cost.
+{-# LANGUAGE PatternGuards #-}
+module Muniq where
 
 import Control.Monad (liftM, foldM)
 import Data.List     (tails, foldl', maximumBy)
 import Data.Ord      (comparing)
 import Data.Tree     (Tree( Node ), Forest)
+import Data.Vector   ((!), Vector)
+import qualified Data.Vector as V
 
 data Uniqed a = Single a
               | Group Int [Uniqed a]
   deriving (Show,Eq)
 
--- The above exemple is encoded as:
---  [Group 2 [Group 2 [Single 1, Single 2], Single 4], Single 5]
-
--- Sorry, this is useful
+-- Generic stuff
 (.:) = (.).(.)
+a ... b = [a .. b-1]
+for = flip map
 
 -- Applies a function to every node of an [Uniqed] tree
 mumap = map . umap
@@ -74,81 +58,87 @@ data Pattern = Pattern { patternLength :: Int
                        , patternStart :: Int
                        , patternTimes :: Int
                        }
-  deriving Show
+  deriving (Show,Eq)
 
-slices :: Int -> [a] -> [[a]]
-slices _ [] = []
-slices n l = let (start, rest) = splitAt n l in start : slices n rest
+detectRepeat :: Eq a => Int -> Vector a -> [Maybe Pattern]
+detectRepeat patlen arr = [ detectRepeat' offset | offset <- [0 .. (patlen - 1)] ]
+  where
+    detectRepeat' offset = case detectRepeat' (offset + patlen) of
+                             Just (Pattern l s t) | arr ! offset == arr ! (offset + patlen) -> Just $ Pattern l offset (t+1)
+                                                  | otherwise                               -> Just $ Pattern l s t
+                             Nothing              | arr ! offset == arr ! (offset + patlen) -> Just $ Pattern patlen offset 2
+                                                  | otherwise                               -> Nothing
+eq (x:xs) = all (== x) xs
+eq []     = True
 
-rle :: Eq a => [a] -> [Int]
-rle = rle' 1
-  where rle' :: Eq a => Int -> [a] -> [Int]
-        rle' n (x:y:xs) | x == y    = rle' (n+1) (y:xs)
-                        | otherwise = n : rle' 1 (y:xs)
-        rle' n [_] = [n]
-        rle' _ []  = []
+allPatterns arrlen = [ p | patlen <- [1..arrlen `quot` 2]
+                         , offset <- 0 ... patlen
+                         , p      <- allPatterns' patlen arrlen offset ]
 
-patterns :: Eq a => [a] -> [Pattern]
-patterns l = concatMap (flip detectRepeat l) [1 .. (length l `div` 2) ]
+allPatterns' patlen arrlen offset = let maxlen = (arrlen - offset) `quot` patlen
+                                    in [ let s = offset + n * patlen
+                                         in Pattern patlen s t
+                                       | n <- [0..maxlen]
+                                       , t <- [2..maxlen - n] ]
 
-detectRepeat :: Eq a => Int -> [a] -> [Pattern]
-detectRepeat length list = [ Pattern length (offset+length*s) t
-                           | offset <- [0 .. (length - 1)]
-                           , (t, s) <- let offseted = drop offset list
-                                           sliced   = slices length offseted
-                                           rle'd    = rle sliced 
-                                       in zip rle'd $ scanl (+) 0 rle'd
-                           , t > 1 ]
+findPatterns arr = filter (isPattern arr) $ allPatterns $ V.length arr
+
+isPattern arr (Pattern l s t) = all eq $
+                                    for (0...l) $ \offset ->
+                                        for (0...t) $ \iter ->
+                                            arr ! (s + offset + iter * l)
 
 score :: Pattern -> Int
 score (Pattern l s t) = (t - 1) * l 
 
+-- Two patterns intersect
+-- current implementation is WRONG!
 intersect :: Pattern -> Pattern -> Bool
-intersect p@(Pattern l s t) p'@(Pattern l' s' t') = let e = endPat p
-                                                        e' = endPat p'
+intersect p@(Pattern l s t) p'@(Pattern l' s' t') = let e = patEnd p
+                                                        e' = patEnd p'
                                                     in s <= s' && s' < e || s <= e' && e' < e
-segmentIntersect (a,b) (c,d) = b <= c || d <= a
 
 ceilMul :: Integral a => a -> a -> a
 ceilMul a b = a + let r = a `mod` b
                   in case r of 0 -> 0
                                _ -> b - r 
 
-endPat (Pattern l s t) = s + l * t
+patEnd (Pattern l s t) = s + l * t
+patLen (Pattern l s t) = l * t
 
 cutPatternAt :: Pattern -> Int -> Maybe (Pattern, Pattern)
-cutPatternAt p@(Pattern l s t) c | c < s || c >= endPat p = Nothing
+cutPatternAt p@(Pattern l s t) c | c < s || c >= patEnd p = Nothing
                                  | otherwise              = Just $ cutPatternAtUnsafe p c
 
 cutPatternAtUnsafe :: Pattern -> Int -> (Pattern, Pattern)
 cutPatternAtUnsafe p@(Pattern l s t) c = let before  = c - s
                                              t1      = before `div` l
                                              s2      = s + ceilMul before l
-                                             after   = endPat p - c
+                                             after   = patEnd p - c
                                              t2      = after `div` l
                                          in (Pattern l s t1, Pattern l s2 t2)
 
 cutPattern :: Pattern -> Pattern -> [Pattern]
 cutPattern p@(Pattern l s t) p'
     | Nothing      <- cutPatternAt p' s
-    , Nothing      <- cutPatternAt p' (endPat p) = [p']
+    , Nothing      <- cutPatternAt p' (patEnd p) = [p']
     | Just (p1,p2) <- cutPatternAt p' s
-    , Nothing      <- cutPatternAt p' (endPat p) = [p1, p2]
+    , Nothing      <- cutPatternAt p' (patEnd p) = [p1, p2]
     | Nothing      <- cutPatternAt p' s
-    , Just (p1,p2) <- cutPatternAt p' (endPat p) = [p1, p2]
+    , Just (p1,p2) <- cutPatternAt p' (patEnd p) = [p1, p2]
     | Just (p1,p2) <- cutPatternAt p' s
-    , Just (p3,p4) <- cutPatternAt p2 (endPat p) = [p1, p3, p4]
+    , Just (p3,p4) <- cutPatternAt p2 (patEnd p) = [p1, p3, p4]
 
 cutPatternF :: Pattern -> Pattern -> Forest Pattern
 cutPatternF p@(Pattern l s t) p'
     | Nothing      <- cutPatternAt p' s
-    , Nothing      <- cutPatternAt p' (endPat p) = [Node p [], Node p' []]
+    , Nothing      <- cutPatternAt p' (patEnd p) = [Node p [], Node p' []]
     | Just (p1,p2) <- cutPatternAt p' s
-    , Nothing      <- cutPatternAt p' (endPat p) = [Node p1 [], Node p [Node p2 []]]
+    , Nothing      <- cutPatternAt p' (patEnd p) = [Node p1 [], Node p [Node p2 []]]
     | Nothing      <- cutPatternAt p' s
-    , Just (p1,p2) <- cutPatternAt p' (endPat p) = [Node p [Node p1 []], Node p2 []]
+    , Just (p1,p2) <- cutPatternAt p' (patEnd p) = [Node p [Node p1 []], Node p2 []]
     | Just (p1,p2) <- cutPatternAt p' s
-    , Just (p3,p4) <- cutPatternAt p2 (endPat p) = [Node p1 [], Node p [Node p3 []], Node p4 []]
+    , Just (p3,p4) <- cutPatternAt p2 (patEnd p) = [Node p1 [], Node p [Node p3 []], Node p4 []]
 
 applyCouples :: (a -> a -> b) -> [a] -> [b]
 applyCouples op xs = [ a `op` b | a:bs <- tails xs, b <- bs ]
@@ -157,7 +147,7 @@ anyCouple :: (a -> a -> Bool)  -> [a] -> Bool
 anyCouple = or .: applyCouples
 
 foldWithPatterns :: [a] -> [Pattern] -> Maybe [Uniqed a]
-foldWithPatterns l pat | any (\x -> endPat x > length l) pat = Nothing
+foldWithPatterns l pat | any (\x -> patEnd x > length l) pat = Nothing
 foldWithPatterns _ pat | anyCouple intersect pat = Nothing
 foldWithPatterns l pat = foldWithPatternsUnsafe l pat
                         
