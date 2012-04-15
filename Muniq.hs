@@ -2,11 +2,17 @@
 module Muniq where
 
 import Control.Monad (liftM, foldM)
-import Data.List     (tails, foldl', maximumBy)
+import Data.List     (tails, foldl', maximumBy, sort)
 import Data.Ord      (comparing)
 import Data.Tree     (Tree( Node ), Forest)
 import Data.Vector   ((!), Vector)
 import qualified Data.Vector as V
+
+-- some functions come in three versions:
+-- * The safe version, with return type Maybe a (example name: f)
+-- * The unsafe version, which may fail (example name: fUnsafe)
+-- * The unkind version, which may have an incoherent result if preconditions
+--   are not met (exemple name: f')
 
 data Uniqed a = Single a
               | Group Int [Uniqed a]
@@ -75,11 +81,12 @@ allPatterns arrlen = [ p | patlen <- [1..arrlen `quot` 2]
                          , offset <- 0 ... patlen
                          , p      <- allPatterns' patlen arrlen offset ]
 
-allPatterns' patlen arrlen offset = let maxlen = (arrlen - offset) `quot` patlen
-                                    in [ let s = offset + n * patlen
-                                         in Pattern patlen s t
-                                       | n <- [0..maxlen]
-                                       , t <- [2..maxlen - n] ]
+allPatterns' patlen arrlen offset = [ let s = offset + n * patlen
+                                      in Pattern patlen s t
+                                    | n <- [0..maxlen]
+                                    , t <- [2..maxlen - n] ]
+  where
+    maxlen = (arrlen - offset) `quot` patlen
 
 findPatterns arr = filter (isPattern arr) $ allPatterns $ V.length arr
 
@@ -92,12 +99,14 @@ score :: Pattern -> Int
 score (Pattern l s t) = (t - 1) * l 
 
 -- Two patterns intersect
--- current implementation is WRONG!
+-- WARNING: only checks if some part of p' is in p; not the opposite.
 intersect :: Pattern -> Pattern -> Bool
-intersect p@(Pattern l s t) p'@(Pattern l' s' t') = let e = patEnd p
-                                                        e' = patEnd p'
-                                                    in s <= s' && s' < e || s <= e' && e' < e
+intersect p p' = intersect' p p' || intersect' p' p
+intersect' p@(Pattern l s t) p'@(Pattern l' s' t') = let e = patEnd p
+                                                         e' = patEnd p'
+                                                     in s <= s' && s' < e || s <= e' && e' < e
 
+-- ceils a to a multiple of b
 ceilMul :: Integral a => a -> a -> a
 ceilMul a b = a + let r = a `mod` b
                   in case r of 0 -> 0
@@ -168,7 +177,7 @@ takeU' n (x:xs) = case lengthU' x of l | l == n -> return [x]
                                        | l > n  -> let Group r c = x in takeU' n c
 
 splitU :: Int -> [Uniqed a] -> Maybe ([Uniqed a],[Uniqed a])
-splitU 0 _ = Just ([],[])
+splitU 0 xs = Just ([],xs)
 splitU n [] = Nothing
 splitU n (x:xs) = case lengthU' x of l | l == n -> return ([x],xs)
                                        | l < n  -> do (a,b) <- splitU (n - l) xs
@@ -188,7 +197,16 @@ applyPattern p@(Pattern l s t) (x:xs) = let lx = lengthU' x
                                            then let Group r c = x
                                                 in applyPattern  p c
                                            else applyPattern (Pattern l (s - lx) t) xs
-                                                                  
+
+instance Ord Pattern where compare = comparing score
+
+efficientPatternsFlat :: [Pattern] -> [Pattern]
+efficientPatternsFlat = noIntersect . sort
+
+noIntersect :: [Pattern] -> [Pattern]
+noIntersect (x:xs) = x : noIntersect (filter (not . intersect x) xs)
+noIntersect xs = xs
+
 efficientFirst :: [a] -> [Pattern] -> [Uniqed a]
 efficientFirst l ps = let Just x = efficientFirst' (muniqNoop l) ps in x
   where
