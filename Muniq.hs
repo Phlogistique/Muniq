@@ -1,6 +1,7 @@
 module Muniq where
 
 import Control.Monad (liftM)
+import Data.List     (sort)
 
 import Muniq.Uniqed
 import Muniq.Utils
@@ -15,21 +16,27 @@ import Muniq.PrettyPrint
 
 
 splitWhen _ [] = []
-splitWhen f (x:xs) = if f x
-                   then splitWhen f xs
-                   else let (a,b) = splitWhen' f (x:xs)
-                        in a : splitWhen f b
-splitWhen' f [] = ([],[])
-splitWhen' f (x:xs) = if f x
-                    then ([],x:xs) 
-                    else let (a,b) = splitWhen' f xs
-                         in (x:a,b)
+splitWhen f xs = a : splitWhen f b
+  where
+    (a,b) = splitWhen' f xs
+    splitWhen' f [] = ([],[])
+    splitWhen' f (x:xs) | f x       = ([],xs) 
+                        | otherwise = let (a,b) = splitWhen' f xs
+                                      in (x:a,b)
 isNewline '\n' = True
 isNewline '\r' = True
 isNewline _    = False
 
 getLines = liftM (splitWhen isNewline) getContents
 main = do lines <- getLines
-          let Just u = applyPatterns (efficientPatternsFlat $ findPatternsL lines) lines
-          putStr $ showULines u
+          let all = sort $ findPatternsL lines
+--              eff = efficientPatternsFlat all
+--              u = applyPatterns eff lines
+              eff = ept all
+              u = apt eff lines
+--          print all
+--          print eff
+--          print u
+
+          putStr $ showULines flat u
 

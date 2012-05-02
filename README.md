@@ -1,5 +1,7 @@
 Muniq
 =====
+Find patterns in a list of symbols
+----------------------------------
 
 This program converts a list of items into a tree exhibiting patterns of
 repetitions into the list. The names comes from the 'uniq' utility from
@@ -15,8 +17,9 @@ patterns to describe the same list. The program shall implement several
 strategies:
 
 * Noop: does not detect any pattern
-* Big-to-small: Always use the longest patterns
-* Small-to-big: Always use the smallest patterns
+* Big-to-small: Always use the longest patterns (todo)
+* Small-to-big: Always use the smallest patterns (todo)
 * Efficiency-first: Always use the patterns that result in the list being
   the most shortened.
-* Brute-force: Find the shortest description, no matter the cost.
+* Brute-force: Find the shortest description, no matter the cost (todo)
+

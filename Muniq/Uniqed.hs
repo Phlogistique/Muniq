@@ -3,8 +3,8 @@ module Muniq.Uniqed where
 -- Functions that manipulate symbol trees
 
 import Control.Monad (liftM, foldM)
-import Data.List     (maximumBy)
-import Data.Ord      (comparing)
+import Data.Maybe    (fromJust)
+import Data.Tree     (Tree(Node), Forest)
 
 import Muniq.Utils
 import Muniq.Search
@@ -73,20 +73,19 @@ splitU n (x:xs) = case lengthU' x of l | l == n -> return ([x],xs)
 takeU = liftM fst .: splitU
 dropU = liftM snd .: splitU
 
--- Below, several functions try to apply a pattern. Not everyone of them make
--- sense.
-
 -- This function tries to apply a Pattern, but may fail in the process
+-- It tries only to apply the pattern to the upper-level layer of the tree
 applyPattern :: Pattern -> [Uniqed a] -> Maybe [Uniqed a]
-applyPattern _ [] = Nothing
-applyPattern (Pattern l 0 t) (x:xs) = do taken <- takeU l xs
-                                         dropped <- dropU (l * t) xs
-                                         return (Group t taken : dropped)
-applyPattern p@(Pattern l s t) (x:xs) = let lx = lengthU' x
-                                        in if lx < s
-                                           then let Group r c = x
-                                                in applyPattern  p c
-                                           else applyPattern (Pattern l (s - lx) t) xs
+applyPattern = applyPattern' id
+
+-- The actual implementation has one callback parameter that is useful for the
+-- implementation of 'apt'
+applyPattern' _ _ [] = Nothing
+applyPattern' op p@(Pattern l s t) u = do (before,notbefore) <- splitU s u
+                                          after <- dropU (patLen p) notbefore
+                                          gu <- takeU l notbefore
+
+                                          return $ before ++ [Group t $ op gu] ++ after
 
 applyPatterns :: [Pattern] -> [a] -> Maybe [Uniqed a]
 applyPatterns p = applyPatterns' p . muniqNoop
@@ -94,22 +93,12 @@ applyPatterns p = applyPatterns' p . muniqNoop
 applyPatterns' :: [Pattern] -> [Uniqed a] -> Maybe [Uniqed a]
 applyPatterns' p a = foldM (flip applyPattern) a p
 
--- Below is dead code
-foldWithPatterns :: [a] -> [Pattern] -> Maybe [Uniqed a]
-foldWithPatterns l pat | any (\x -> patEnd x > length l) pat = Nothing
-foldWithPatterns _ pat | anyCouple intersect pat = Nothing
-foldWithPatterns l pat = foldWithPatternsUnsafe l pat
-                        
-foldWithPatternsUnsafe :: [a] -> [Pattern] -> Maybe [Uniqed a]
-foldWithPatternsUnsafe l p = foldM (flip applyPattern) (muniqNoop l) p
-
-efficientFirst :: [a] -> [Pattern] -> [Uniqed a]
-efficientFirst l ps = let Just x = efficientFirst' (muniqNoop l) ps in x
+-- apt: Apply Pattern Tree
+-- Applies a Tree of patterns
+apt :: Forest Pattern -> [a] -> [Uniqed a]
+apt fp = apt' fp . muniqNoop
   where
-    efficientFirst' :: [Uniqed a] -> [Pattern] -> Maybe [Uniqed a]
-    efficientFirst' l [] = Just $ muniqFlatten l
-    efficientFirst' l ps = do let p = maximumBy (comparing score) ps
-                                  ps' = concatMap (cutPattern p) ps
-                              applied <- applyPattern p l
-                              efficientFirst' applied ps'
+    apt' :: Forest Pattern -> [Uniqed a] -> [Uniqed a]
+    apt' (Node p children : xs) us = apt' xs $ fromJust $ applyPattern' (apt' children) p us
+    apt' [] us = us
 
