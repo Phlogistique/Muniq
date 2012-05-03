@@ -1,4 +1,4 @@
-module Muniq where
+module Main where
 
 import Control.Monad (liftM)
 import Data.List     (sort)
