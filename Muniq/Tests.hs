@@ -63,7 +63,7 @@ vecExample = V.fromList listExample
 case_isPattern1 = True @=? isPattern vecExample (Pattern 1 2 3) 
 case_isPattern2 = False @=? isPattern vecExample (Pattern 1 2 4)
 case_isPattern3 = True @=? isPattern vecExample (Pattern 4 1 2)
-case_findPatterns1 = True @=? (Pattern 1 2 3) `elem` findPatterns vecExample
+case_findPatterns1 = True @=? Pattern 1 2 3 `elem` findPatterns vecExample
 case_allPatterns0 = [] @=? allPatterns 0
 case_allPatterns1 = [] @=? allPatterns 1
 case_allPatterns2 = [Pattern 1 0 2] @=? allPatterns 2

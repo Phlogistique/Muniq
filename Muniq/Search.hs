@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 module Muniq.Search where
 
 -- Functions to find patterns in flat lists/vectors
@@ -38,8 +37,8 @@ intersect' p@(Pattern l s t) p'@(Pattern l' s' t') = let e = patEnd p
 
 subordinate :: Pattern -> Pattern -> Either Bool Pattern
 subordinate p@(Pattern l s t) p'@(Pattern l' s' t') | s <= s' && s' + patLen p' <= s + l = Right $ Pattern l' (s'-s) t'
-                                                    | intersect p p'                     = Left $ True
-                                                    | otherwise                          = Left $ False
+                                                    | intersect p p'                     = Left True
+                                                    | otherwise                          = Left False
 
 -- Uses "++" to preserve order
 subordinates :: Pattern -> [Pattern] -> ([Pattern], [Pattern])

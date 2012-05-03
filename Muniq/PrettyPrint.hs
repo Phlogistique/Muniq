@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 module Muniq.PrettyPrint where
 
 -- Functions that display symbol trees in a human-readable way

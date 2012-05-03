@@ -51,7 +51,7 @@ uniq' (x:xs) = x : uniq' xs
 uniq' [] = []
 
 lengthU :: [Uniqed a] -> Int
-lengthU = foldl (+) 0 . map lengthU'
+lengthU = sum . map lengthU'
 
 lengthU' (Single _)  = 1
 lengthU' (Group r c) = r * lengthU c
