@@ -17,9 +17,10 @@ patterns to describe the same list. The program shall implement several
 strategies:
 
 * Noop: does not detect any pattern
-* Big-to-small: Always use the longest patterns (todo)
-* Small-to-big: Always use the smallest patterns (todo)
+* Big-to-small: Always use the longest patterns
+* Small-to-big: Always use the smallest patterns
 * Efficiency-first: Always use the patterns that result in the list being
   the most shortened.
 * Brute-force: Find the shortest description, no matter the cost (todo)
 
+The current implementations are rather inefficient.

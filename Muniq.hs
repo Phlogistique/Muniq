@@ -1,42 +1,19 @@
-module Main where
+module Muniq (efficientTree, efficientFlat, bigFirst, smallFirst, bruteForce, noop, uniq, Uniqed(..)) where
 
-import Control.Monad (liftM)
-import Data.List     (sort)
+import Data.List  (sort, sortBy, permutations, maximumBy)
+import Data.Maybe (fromJust)
+import Data.Ord   (comparing)
 
-import Muniq.Uniqed
-import Muniq.Utils
-import Muniq.Search
-import Muniq.PrettyPrint
+import Muniq.Uniqed (Uniqed(..))
+import Muniq.Utils (orBy)
+import qualified Muniq.Uniqed as U
+import qualified Muniq.Search as S
 
--- some functions come in three versions:
--- * The safe version, with return type Maybe a (example name: f)
--- * The unsafe version, which may fail (example name: fUnsafe)
--- * The unkind version, which may have an incoherent result if preconditions
---   are not met (exemple name: f')
-
-
-splitWhen _ [] = []
-splitWhen f xs = a : splitWhen f b
-  where
-    (a,b) = splitWhen' f xs
-    splitWhen' f [] = ([],[])
-    splitWhen' f (x:xs) | f x       = ([],xs) 
-                        | otherwise = let (a,b) = splitWhen' f xs
-                                      in (x:a,b)
-isNewline '\n' = True
-isNewline '\r' = True
-isNewline _    = False
-
-getLines = liftM (splitWhen isNewline) getContents
-main = do lines <- getLines
-          let all = sort $ findPatternsL lines
---              eff = efficientPatternsFlat all
---              u = applyPatterns eff lines
-              eff = ept all
-              u = apt eff lines
---          print all
---          print eff
---          print u
-
-          putStr $ showULines flat u
-
+efficientTree, efficientFlat, noop, uniq :: (Eq a) => [a] -> [Uniqed a]
+efficientTree syms = U.apt (S.ept $ sort $ S.findPatternsL syms) syms
+bigFirst syms = U.apt (S.ept $ sortBy (S.patternLength `orBy` S.score) $ S.findPatternsL syms) syms
+smallFirst syms = U.apt (S.ept $ sortBy ((*(-1)) . S.patternLength `orBy` S.score) $ S.findPatternsL syms) syms
+bruteForce syms = U.apt (maximumBy (comparing S.scoreTree) $ map S.ept $ permutations $ S.findPatternsL syms) syms
+efficientFlat syms = fromJust $ U.applyPatterns (S.efficientPatternsFlat $ S.findPatternsL syms) syms
+noop = U.muniqNoop
+uniq = U.uniq

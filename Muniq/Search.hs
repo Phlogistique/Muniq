@@ -5,23 +5,25 @@ module Muniq.Search where
 import Control.Arrow (first, second)
 import Data.Function (on)
 import Data.List     (sort)
-import Data.Tree     (Tree( Node ), Forest)
+import Data.Tree     (Tree( Node ), Forest, flatten)
 import Data.Vector   (Vector, (!))
 import qualified Data.Vector as V
 
 import Muniq.Utils
 
-data Pattern = Pattern Int Int Int
---                       { patternLength :: Int
---                       , patternStart :: Int
---                       , patternTimes :: Int
---                       }
+data Pattern = Pattern { patternLength :: Int
+                       , patternStart :: Int
+                       , patternTimes :: Int
+                       }
   deriving (Show,Eq)
 
 instance Ord Pattern where compare = flip (compare `on` score)
 
 score :: Pattern -> Int
 score (Pattern l s t) = (t - 1) * l 
+
+scoreTree :: Forest Pattern -> Int
+scoreTree = sum . map (sum . map patternLength . flatten)
 
 -- Two patterns intersect
 intersect :: Pattern -> Pattern -> Bool
@@ -124,13 +126,4 @@ cutPatternF p@(Pattern l s t) p' = case (cutPatternAt p' s, cutPatternAt p' $ pa
                                         (Just (p1,p2)     , Nothing                   ) -> [Node p1 [], Node p [Node p2 []]]
                                         (Nothing          , Just (p1,p2)              ) -> [Node p [Node p1 []], Node p2 []]
                                         (Just (p1,p2)     , Just (p3,p4)              ) -> [Node p1 [], Node p [Node p3 []], Node p4 []]
-
-
-
-
-
-
-
-
-
 
