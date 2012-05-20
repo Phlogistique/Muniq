@@ -21,6 +21,10 @@ strategies:
 * Small-to-big: Always use the smallest patterns
 * Efficiency-first: Always use the patterns that result in the list being
   the most shortened.
-* Brute-force: Find the shortest description, no matter the cost (todo)
+* Brute-force: Find the shortest description, no matter the cost
 
-The current implementations are rather inefficient.
+The current implementations are rather inefficient. The big-to-small and
+small-to-big strategies are implemented in terms of the Efficiency-first
+strategy, when they prolly could be much faster. The brute-force strategy is
+horribly slower than it prolly needs to be.
+
