@@ -35,10 +35,7 @@ partRel op (x:xs) = let (t,f) = partition (op x) xs
                     in (x : t', t ++ f')
 partRel _ xs = (xs,[])
 
--- polymorphic lexicographic ordering
-infixr 1 `orBy`
-
-(f `orBy` f') x x' = case comparing f x x' of
-                       EQ  -> comparing f' x x'
-                       ord -> ord
-
+newtype Reverse a = Reverse a
+instance Eq a => Eq (Reverse a) where (Reverse a) == (Reverse b) = a == b
+instance Ord a => Ord (Reverse a) where
+    compare (Reverse a) (Reverse b) = compare b a
