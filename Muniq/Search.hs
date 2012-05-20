@@ -54,10 +54,14 @@ subordinates p = foldl subordinates' ([],[])
 ept :: [Pattern] -> Forest Pattern
 ept xs = let (a,b) = partIntersect xs
          in ept' a b
-ept' :: [Pattern] -> [Pattern] -> Forest Pattern
-ept' (x:xs) rest = let (a,b) = subordinates x rest
-                   in Node x (ept a) : ept' xs b
-ept' [] _ = []
+  where
+    partIntersect :: [Pattern] -> ([Pattern], [Pattern])
+    partIntersect = partRel intersect
+
+    ept' :: [Pattern] -> [Pattern] -> Forest Pattern
+    ept' (x:xs) rest = let (a,b) = subordinates x rest
+                       in Node x (ept a) : ept' xs b
+    ept' [] _ = []
 
 -- ceils a to a multiple of b
 ceilMul :: Integral a => a -> a -> a
@@ -96,9 +100,6 @@ efficientPatternsFlat = noIntersect . sort
 noIntersect :: [Pattern] -> [Pattern]
 noIntersect (x:xs) = x : noIntersect (filter (not . intersect x) xs)
 noIntersect xs = xs
-
-partIntersect :: [Pattern] -> ([Pattern], [Pattern])
-partIntersect = partRel intersect
 
 -- What follows is dead code
 cutPatternAt :: Pattern -> Int -> Maybe (Pattern, Pattern)

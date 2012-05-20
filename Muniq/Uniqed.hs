@@ -82,8 +82,8 @@ applyPattern = applyPattern' id
 -- implementation of 'apt'
 applyPattern' _ _ [] = Nothing
 applyPattern' op p@(Pattern l s t) u = do (before,notbefore) <- splitU s u
-                                          after <- dropU (patLen p) notbefore
                                           gu <- takeU l notbefore
+                                          after <- dropU (l * (t - 1)) gu
 
                                           return $ before ++ [Group t $ op gu] ++ after
 
